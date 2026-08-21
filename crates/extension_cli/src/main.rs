@@ -15,6 +15,7 @@ use extension::extension_builder::CompilationConcurrency;
 use extension::extension_builder::{CompileExtensionOptions, ExtensionBuilder};
 use extension::{ExtensionManifest, ExtensionSnippets};
 use language::LanguageConfig;
+use language::QueryFile;
 use reqwest_client::ReqwestClient;
 use settings_content::SemanticTokenRules;
 use snippet_provider::file_to_snippets;
@@ -483,19 +484,28 @@ fn test_languages(
                                 )
                             })?;
                 }
-                _ if file_name.ends_with(".scm") => {
-                    let grammar = grammar.with_context(|| {
-                        format! {
-                            "language {} provides query {} but no grammar",
-                            config.name,
-                            file_path.display()
-                        }
-                    })?;
+                _ => {
+                    if let Ok(_query) = file_name.parse::<QueryFile>() {
+                        let grammar = grammar.with_context(|| {
+                            format! {
+                                "language {} provides query {} but no grammar",
+                                config.name,
+                                file_path.display()
+                            }
+                        })?;
 
-                    let query_source = fs::read_to_string(&file_path)?;
-                    let _query = Query::new(grammar, &query_source)?;
+                        let query_source = fs::read_to_string(&file_path)?;
+                        let _query = Query::new(grammar, &query_source)?;
+                    } else if file_name.ends_with(".scm") {
+                        bail!(
+                            "unrecognized query found: Query {file_name} is not supported by Zed and should be removed"
+                        )
+                    } else {
+                        bail!(
+                            "file {file_name} is not recognized within languages and should be removed"
+                        )
+                    }
                 }
-                _ => {}
             }
         }
 
